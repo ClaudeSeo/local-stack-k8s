@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: local-stack
+
+spec:
+  capacity:
+    storage: 2Gi
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /private/tmp/local-stack
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: local-stack
+
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  volumeName: local-stack
+  storageClassName: manual
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: local-stack
+
+spec:
+  selector:
+    matchLabels:
+      app: local-stack
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: local-stack
+    spec:
+      containers:
+          - name: local-stack
+            image: localstack/localstack
+            ports:
+              - containerPort: 31000 # DynamoDB
+              - containerPort: 31001 # DynamoDB Stream
+              - containerPort: 31002 # S3
+              - containerPort: 31003 # SNS
+              - containerPort: 31004 # SQS
+              - containerPort: 32000 # Web UI
+            env:
+              - name: SERVICES
+                value: "dynamodb:31000,dynamodbstreams:31001,s3:31002,sns:31003,sqs:31004"
+              - name: PORT_WEB_UI
+                value: "32000"
+              - name: DATA_DIR
+                value: "/tmp/localstack/data"
+            volumeMounts:
+              - name: local-stack-mnt
+                mountPath: /tmp/localstack
+              - name: dockersock
+                mountPath: /var/run/docker.sock
+      volumes:
+        - name: local-stack-mnt
+          persistentVolumeClaim:
+            claimName: local-stack
+        - name: dockersock
+          hostPath:
+            path: /var/run/docker.sock
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: local-stack
+
+spec:
+  selector:
+    app: local-stack
+  type: LoadBalancer
+  ports:
+      - port: 32000
+        protocol: TCP
+        name: web
+        nodePort: 32000
+      - port: 31000
+        protocol: TCP
+        name: dynamodb
+        nodePort: 31000
+      - port: 31001
+        protocol: TCP
+        name: dynamodbstreams
+        nodePort: 31001
+      - port: 31002
+        protocol: TCP
+        name: s3
+        nodePort: 31002
+      - port: 31003
+        protocol: TCP
+        name: sns
+        nodePort: 31003
+      - port: 31004
+        protocol: TCP
+        name: sqs
+        nodePort: 31004
