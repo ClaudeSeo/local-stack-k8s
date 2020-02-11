@@ -10,7 +10,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   hostPath:
-    path: /private/tmp/local-stack
+    path: /private/tmp/localstack
 
 ---
 apiVersion: v1
@@ -52,19 +52,43 @@ spec:
               - containerPort: 31002 # S3
               - containerPort: 31003 # SNS
               - containerPort: 31004 # SQS
-              - containerPort: 32000 # Web UI
+              - containerPort: 31005 # CFN
+              - containerPort: 31006 # Lambda
+              - containerPort: 31007 # STS
+              - containerPort: 31008 # CloudWatch
+              - containerPort: 32000 # Web
             env:
               - name: SERVICES
-                value: "dynamodb:31000,dynamodbstreams:31001,s3:31002,sns:31003,sqs:31004"
+                value: "sts:31007,kinesis,iam,firehose,lambda:31006,cloudwatch:31008,kms,serverless,cloudformation:31005,dynamodb:31000,dynamodbstreams:31001,s3:31002,sns:31003,sqs:31004"
               - name: PORT_WEB_UI
                 value: "32000"
               - name: DATA_DIR
                 value: "/tmp/localstack/data"
+              - name: LAMBDA_REMOTE_DOCKER
+                value: "True"
+              - name: DEBUG
+                value: "1"
             volumeMounts:
               - name: local-stack-mnt
                 mountPath: /tmp/localstack
               - name: dockersock
                 mountPath: /var/run/docker.sock
+            livenessProbe:
+              httpGet:
+                path: /
+                port: 32000
+                scheme: HTTP
+              initialDelaySeconds: 10
+              periodSeconds: 30
+              timeoutSeconds: 10
+            readinessProbe:
+              httpGet:
+                path: /
+                port: 32000
+                scheme: HTTP
+              initialDelaySeconds: 10
+              periodSeconds: 30
+              timeoutSeconds: 10
       volumes:
         - name: local-stack-mnt
           persistentVolumeClaim:
@@ -108,3 +132,19 @@ spec:
         protocol: TCP
         name: sqs
         nodePort: 31004
+      - port: 31005
+        protocol: TCP
+        name: cfn
+        nodePort: 31005
+      - port: 31006
+        protocol: TCP
+        name: lambda
+        nodePort: 31006
+      - port: 31007
+        protocol: TCP
+        name: sts
+        nodePort: 31007
+      - port: 31008
+        protocol: TCP
+        name: cloudwatch
+        nodePort: 31008
